@@ -57,10 +57,15 @@ contract Engine is AccessControl {
 
     function createFundVault(
         IERC20 asset,
-        uint256 basicPoints
+        uint256 basicPoints,
+        uint256 ownerSharesPercentage
     ) external returns (address) {
         _isAssetExisted(asset);
-        FundVault fundVault = new FundVault(asset, basicPoints);
+        FundVault fundVault = new FundVault(
+            asset,
+            basicPoints,
+            ownerSharesPercentage
+        );
         emit FundVaultCreated(address(fundVault), msg.sender);
         return address(fundVault);
     }

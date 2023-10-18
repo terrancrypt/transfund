@@ -7,17 +7,27 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 
 contract FundVault is ERC4626Fees {
-    address payable public vaultOwner;
-    uint256 public entryFeeBasicPoints;
+    error FundVault__MustBeOwner();
+
+    address payable public immutable i_vaultOwner;
+    uint256 public s_entryFeeBasicPoints;
+    uint256 public s_ownerShares;
+    uint256 private immutable i_ownerSharesPercentage;
 
     constructor(
         IERC20 _asset,
-        uint256 _basicPoints
-    ) ERC4626(_asset) ERC20("Vault TransFund", "vTF") {
-        vaultOwner = payable(msg.sender);
-        entryFeeBasicPoints = _basicPoints;
+        uint256 _basicPoints,
+        uint256 _ownerSharesPercentage
+    ) ERC4626(_asset) ERC20("Vault Trans Fund Token", "vTFT") {
+        i_vaultOwner = payable(msg.sender);
+        s_entryFeeBasicPoints = _basicPoints;
+        i_ownerSharesPercentage = _ownerSharesPercentage;
     }
 
+    /**
+     * @param assets amount asset to deposit
+     * @param receiver who is receive vToken
+     */
     function deposit(
         uint256 assets,
         address receiver
@@ -34,11 +44,7 @@ contract FundVault is ERC4626Fees {
         return shares;
     }
 
-    /** @dev See {IERC4626-mint}.
-     *
-     * As opposed to {deposit}, minting is allowed even if the vault is in a state where the price of a share is zero.
-     * In this case, the shares will be minted without requiring any assets to be deposited.
-     */
+    /** @dev See {IERC4626-mint}. */
     function mint(
         uint256 shares,
         address receiver
@@ -85,19 +91,40 @@ contract FundVault is ERC4626Fees {
         return shares;
     }
 
-    function _exitFeeBasisPoints() internal view override returns (uint256) {
-        return entryFeeBasicPoints;
+    function _entryFeeBasisPoints() internal view override returns (uint256) {
+        return s_entryFeeBasicPoints;
     }
 
     function _entryFeeRecipient() internal view override returns (address) {
-        return vaultOwner;
+        return i_vaultOwner;
     }
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _afterDeposit(uint256 assets, uint256 shares) internal virtual {}
+    // function _isOwnerHasCommitted() internal view returns (bool) {
+    //    uint256 sharesBalance = IERC20(address(this)).balanceOf(i_vaultOwner);
+    // }
 
-    function _beforeWithdraw(uint256 assets, uint256 shares) internal virtual {}
+    function _amountSharesCanMint() internal view returns (uint256) {
+        uint256 investorSharesPercentage = 100 - i_ownerSharesPercentage;
+        uint256 amountSharesCanMint = (s_ownerShares *
+            investorSharesPercentage) / 100;
+        return amountSharesCanMint;
+    }
+
+    function _afterDeposit(uint256 assets, uint256 shares) internal virtual {
+        if (msg.sender == i_vaultOwner) {
+            s_ownerShares += shares;
+        }
+    }
+
+    function _beforeWithdraw(uint256 assets, uint256 shares) internal virtual {
+        // trước khi rút tiền, tính toán một phần tiền lãi cho owner của fund, chuyển phần tiền lãi đó dưới dạng vToken để gửi cho owner
+    }
+
+    function getTotalSharesMinted() public view returns (uint256) {
+        return IERC20(address(this)).totalSupply();
+    }
 }

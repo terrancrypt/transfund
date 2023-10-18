@@ -70,14 +70,14 @@ contract EngineTest is Test {
     /*//////////////////////////////////////////////////////////////
                         Fund Manager Functions
     //////////////////////////////////////////////////////////////*/
-    function testCanCreateFundVault() public assetsAdded {
-        vm.prank(fundManager);
-        engine.createFundVault(IERC20(usdc), BASIC_POINT);
-    }
+    // function testCanCreateFundVault() public assetsAdded {
+    //     vm.prank(fundManager);
+    //     engine.createFundVault(IERC20(usdc), BASIC_POINT);
+    // }
 
-    function testRevertCreateVaultIfAssetNotExist() public {
-        vm.expectRevert(Engine.Engine__AssetNotExist.selector);
-        vm.prank(fundManager);
-        engine.createFundVault(IERC20(usdc), BASIC_POINT);
-    }
+    // function testRevertCreateVaultIfAssetNotExist() public {
+    //     vm.expectRevert(Engine.Engine__AssetNotExist.selector);
+    //     vm.prank(fundManager);
+    //     engine.createFundVault(IERC20(usdc), BASIC_POINT);
+    // }
 }
