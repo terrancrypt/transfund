@@ -1,12 +1,4 @@
 [submodule "smart-contract/lib/forge-std"]
 	path = smart-contract/lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
-[submodule "smart-contract/lib/openzeppelin-contracts"]
-	path = smart-contract/lib/openzeppelin-contracts
-	url = https://github.com/OpenZeppelin/openzeppelin-contracts
-[submodule "smart-contract/lib/v3-periphery"]
-	path = smart-contract/lib/v3-periphery
-	url = https://github.com/Uniswap/v3-periphery
-[submodule "smart-contract/lib/v3-core"]
-	path = smart-contract/lib/v3-core
-	url = https://github.com/uniswap/v3-core
+
