@@ -5,6 +5,7 @@ import {ERC4626Fees} from "../ERC4626/ERC4626Fees.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 contract FundVault is ERC4626Fees {
     error FundVault__MustBeOwner();
@@ -37,7 +38,13 @@ contract FundVault is ERC4626Fees {
             "ERC4626: deposit more than max"
         );
 
-        uint256 shares = previewDeposit(assets);
+        uint256 shares;
+        if (_msgSender() == i_vaultOwner) {
+            shares = assets;
+        } else {
+            shares = previewDeposit(assets);
+        }
+
         _deposit(_msgSender(), receiver, assets, shares);
         _afterDeposit(assets, shares);
 
@@ -125,6 +132,10 @@ contract FundVault is ERC4626Fees {
     }
 
     function getTotalSharesMinted() public view returns (uint256) {
-        return IERC20(address(this)).totalSupply();
+        return IERC4626(address(this)).totalSupply();
+    }
+
+    function getAmountSharesCanMint() public view returns (uint256) {
+        return _amountSharesCanMint();
     }
 }

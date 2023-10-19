@@ -11,8 +11,8 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 contract FundVaultTest is Test {
     using Math for uint256;
 
-    address public vaultOwner; // Fund Manager
-    uint256 public vaultOwnerKey;
+    address public fundManager;
+    uint256 public fundManagerKey;
     address public investor = makeAddr("investor");
     FundVault public fundVault;
     MockUSDC public usdc;
@@ -20,19 +20,34 @@ contract FundVaultTest is Test {
     uint256 private constant FAUCET_AMOUNT = 100e18;
     uint256 private constant _BASIS_POINT_SCALE = 1e4;
     uint256 private constant FEE_BASIS_POINT = 100;
+    uint256 private constant FUND_MANAGER_SHARES_PERCENTAGE = 5;
+    uint256 private constant FUND_MANAGER_AMOUNT = 10000e18; // 10,000 usdc
 
     function setUp() external {
-        (vaultOwner, vaultOwnerKey) = makeAddrAndKey("vaultOwner");
-        vm.startBroadcast(vaultOwnerKey);
-        usdc = new MockUSDC(msg.sender);
-        fundVault = new FundVault(usdc, FEE_BASIS_POINT, 5);
+        (fundManager, fundManagerKey) = makeAddrAndKey("fundManager");
+        vm.startBroadcast(fundManagerKey);
+        usdc = new MockUSDC(fundManager);
+        fundVault = new FundVault(
+            usdc,
+            FEE_BASIS_POINT,
+            FUND_MANAGER_SHARES_PERCENTAGE
+        );
         vm.stopBroadcast();
 
         vm.prank(investor);
         usdc.faucet();
     }
 
-    modifier depositedToVault() {
+    modifier fundManagerDepositToVault() {
+        vm.startPrank(fundManager);
+        usdc.mint(FUND_MANAGER_AMOUNT);
+        usdc.approve(address(fundVault), FUND_MANAGER_AMOUNT);
+        fundVault.deposit(FUND_MANAGER_AMOUNT, fundManager);
+        vm.stopPrank();
+        _;
+    }
+
+    modifier investorDeepositedToVault() {
         vm.startPrank(investor);
         usdc.approve(address(fundVault), FAUCET_AMOUNT);
         fundVault.deposit(FAUCET_AMOUNT, investor);
@@ -40,7 +55,14 @@ contract FundVaultTest is Test {
         _;
     }
 
-    function testCanDepositToFundVault() public depositedToVault {
+    function testFundManagerCanDepositToFundVault()
+        public
+        fundManagerDepositToVault
+    {
+        assert(FUND_MANAGER_AMOUNT == fundVault.s_ownerShares());
+    }
+
+    function testCanDepositToFundVault() public investorDeepositedToVault {
         uint256 investorBalance = IERC4626(fundVault).balanceOf(investor);
         console.log("Investor Balance: ", investorBalance);
         uint256 feeOnTotal = FAUCET_AMOUNT.mulDiv(
@@ -55,7 +77,16 @@ contract FundVaultTest is Test {
         assert(vaultTotalSupply == investorBalance);
     }
 
-    function testGetTotalSharesMinted() public {
-        fundVault.getTotalSharesMinted();
+    function testGetTotalSharesCanMint() public fundManagerDepositToVault {
+        uint256 investorSharesPercentage = 100 - FUND_MANAGER_SHARES_PERCENTAGE;
+        uint256 ownerShares = fundVault.s_ownerShares();
+        console.log("Total Owner Shares", ownerShares);
+        uint256 totalSharesCanMint = (ownerShares * investorSharesPercentage) /
+            100;
+
+        uint256 totalSharesCanMintExpected = fundVault.getAmountSharesCanMint();
+        console.log("Total Shares Can Deposit", totalSharesCanMintExpected);
+
+        assert(totalSharesCanMint == totalSharesCanMintExpected);
     }
 }
