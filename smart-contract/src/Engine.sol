@@ -20,6 +20,8 @@ contract Engine is AccessControl {
     mapping(uint24 assetId => IERC20 asset) private s_assets;
     uint24 private s_currentAssetId;
     mapping(IERC20 asset => bool) private s_assetExist;
+    mapping(address fundManager => address fundVault)
+        private s_fundVaultOwnership;
 
     /*//////////////////////////////////////////////////////////////
                             Constructor
@@ -66,6 +68,9 @@ contract Engine is AccessControl {
             basicPoints,
             ownerSharesPercentage
         );
+
+        s_fundVaultOwnership[_msgSender()] = address(fundVault);
+
         emit FundVaultCreated(address(fundVault), msg.sender);
         return address(fundVault);
     }

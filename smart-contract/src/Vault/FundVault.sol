@@ -6,8 +6,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
+/// @title Fund Vault Contract for TransFund Protocol
+/// @author terrancrypt
+/// @notice This contract helps the Fund Manager manage their fund, helping to calculate the number of vToken (or shares) deposite and withdraw from the fund.
+/// @dev Default token decimals = 18, currently there are no additional features for decimals of each type of ERC20 token.
 contract FundVault is ERC4626Fees {
     error FundVault__MustBeOwner();
     error FundVault__VaultIsFull();
@@ -18,6 +22,14 @@ contract FundVault is ERC4626Fees {
     uint256 public s_ownerShares;
     uint256 public immutable i_ownerSharesPercentage;
     uint256 public s_totalSharesCanMint;
+
+    struct TokenInvest {
+        address token;
+        uint256 amount;
+        address priceFeed;
+    }
+    mapping(uint256 tokenInvestId => TokenInvest) private s_tokenInvested;
+    uint256 private s_currentTokenInvestId;
 
     constructor(
         IERC20 _asset,
@@ -41,17 +53,14 @@ contract FundVault is ERC4626Fees {
     modifier isOwnerCanWithdraw(uint256 assetsOrShares) {
         if (
             _msgSender() == i_vaultOwner &&
-            assetsOrShares < _amountOwnerCanWithDraw()
+            assetsOrShares < _amountOwnerCanWithDraw() &&
+            i_ownerSharesPercentage > 0
         ) {
             revert FundVault__OwnerCantWithdraw();
         }
         _;
     }
 
-    /**
-     * @param assets amount asset to deposit
-     * @param receiver who is receive vToken
-     */
     function deposit(
         uint256 assets,
         address receiver
@@ -61,15 +70,16 @@ contract FundVault is ERC4626Fees {
             "ERC4626: deposit more than max"
         );
 
-        uint256 shares = previewDeposit(assets);
-
+        uint256 shares = _calculateSharesToMint(assets);
+        shares = previewDeposit(shares);
         _deposit(_msgSender(), receiver, assets, shares);
         _afterDeposit(shares);
 
         return shares;
     }
 
-    /** @dev See {IERC4626-mint}. */
+    /// @notice This function has not yet been modified or deployed for use due to the limited time of the ETHGlobal Hackathon.
+    /// @dev Use function deposit instead.
     function mint(
         uint256 shares,
         address receiver
@@ -83,7 +93,8 @@ contract FundVault is ERC4626Fees {
         return assets;
     }
 
-    /** @dev See {IERC4626-redeem}. */
+    /// @notice This function has not yet been modified or deployed for use due to the limited time of the ETHGlobal Hackathon.
+    /// @dev Use function withdraw instead.
     function redeem(
         uint256 shares,
         address receiver,
@@ -92,13 +103,12 @@ contract FundVault is ERC4626Fees {
         require(shares <= maxRedeem(owner), "ERC4626: redeem more than max");
 
         uint256 assets = previewRedeem(shares);
-        _beforeWithdraw(assets, shares);
+        _beforeWithdraw(assets);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
-
+        _afterWithdraw(shares);
         return assets;
     }
 
-    /** @dev See {IERC4626-withdraw}. */
     function withdraw(
         uint256 assets,
         address receiver,
@@ -110,9 +120,9 @@ contract FundVault is ERC4626Fees {
         );
 
         uint256 shares = previewWithdraw(assets);
-        _beforeWithdraw(assets, shares);
+        _beforeWithdraw(assets);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
-
+        _afterWithdraw(assets);
         return shares;
     }
 
@@ -123,14 +133,6 @@ contract FundVault is ERC4626Fees {
     function _entryFeeRecipient() internal view override returns (address) {
         return i_vaultOwner;
     }
-
-    /*//////////////////////////////////////////////////////////////
-                          INTERNAL HOOKS LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    // function _isOwnerHasCommitted() internal view returns (bool) {
-    //    uint256 sharesBalance = IERC20(address(this)).balanceOf(i_vaultOwner);
-    // }
 
     function _afterDeposit(uint256 shares) internal virtual {
         if (_msgSender() == i_vaultOwner && i_ownerSharesPercentage > 0) {
@@ -146,20 +148,19 @@ contract FundVault is ERC4626Fees {
         }
     }
 
-    function _beforeWithdraw(uint256 assets, uint256 shares) internal virtual {
+    function _beforeWithdraw(uint256 assets) internal virtual {
         // trước khi rút tiền, tính toán một phần tiền lãi cho owner của fund, chuyển phần tiền lãi đó dưới dạng vToken để gửi cho owner
     }
 
     function _afterWithdraw(uint256 shares) internal virtual {
         if (_msgSender() == i_vaultOwner && i_ownerSharesPercentage > 0) {
-            require(shares <= s_ownerShares, "Insufficient owner shares");
             s_ownerShares -= shares;
             s_totalSharesCanMint =
-                s_totalSharesCanMint +
+                s_totalSharesCanMint -
                 ((shares / i_ownerSharesPercentage) * 100);
         } else {
             s_totalSharesCanMint =
-                s_totalSharesCanMint -
+                s_totalSharesCanMint +
                 getTotalSharesMinted();
         }
     }
@@ -173,9 +174,6 @@ contract FundVault is ERC4626Fees {
             _actualOwnerSharesPercentage() > i_ownerSharesPercentage &&
             _actualOwnerSharesPercentage() < 10000
         ) {
-            // uint256 percentageCanWithdraw = _actualOwnerSharesPercentage() -
-            //     i_ownerSharesPercentage;
-
             uint256 amountCanWithdraw = s_ownerShares -
                 ((_totalAmountUserMinted() * i_ownerSharesPercentage) / 100);
 
@@ -195,6 +193,56 @@ contract FundVault is ERC4626Fees {
             getTotalSharesMinted();
     }
 
+    function _calculateSharesToMint(
+        uint256 amountToDeposit
+    ) internal view returns (uint256) {
+        if (s_currentTokenInvestId == 0 || getTotalSharesMinted() == 0) {
+            return amountToDeposit;
+        }
+        uint256 totalCapitalOfVault = _calculateTotalCapitalInUSD();
+        uint256 totalSharesSupply = getTotalSharesMinted();
+        uint256 amountSharesToMint = (amountToDeposit * totalSharesSupply) /
+            totalCapitalOfVault;
+        return amountSharesToMint;
+    }
+
+    function _calculateAmountInUSDToWithdraw(
+        uint256 amountSharesToBurn
+    ) internal view returns (uint256) {
+        if (s_currentTokenInvestId == 0 || getTotalSharesMinted() == 0) {
+            return amountSharesToBurn;
+        }
+        uint256 totalCapitalOfVault = _calculateTotalCapitalInUSD();
+        uint256 totalShareSupply = getTotalSharesMinted();
+        uint256 amountUSDToWithdraw = (amountSharesToBurn *
+            totalCapitalOfVault) / totalShareSupply;
+        return amountUSDToWithdraw;
+    }
+
+    function _calculateTotalCapitalInUSD() internal view returns (uint256) {
+        uint256 totalAmountInUSD;
+        for (uint256 i; i < s_currentTokenInvestId; i++) {
+            uint256 tokenAmount = s_tokenInvested[s_currentTokenInvestId]
+                .amount;
+            address priceFeed = s_tokenInvested[s_currentTokenInvestId]
+                .priceFeed;
+            (, int256 answer, , , ) = AggregatorV3Interface(priceFeed)
+                .latestRoundData();
+            uint256 tokenAmountInUSD = tokenAmount * (uint256(answer) * 1e10);
+            totalAmountInUSD += tokenAmountInUSD;
+        }
+        return totalAmountInUSD;
+    }
+
+    function _calculateSharesRatio(
+        address user
+    ) internal view returns (uint256) {
+        uint256 balanceShares = IERC4626(address(this)).balanceOf(user);
+        uint256 ratioInBasisPoint = (balanceShares / getTotalSharesMinted()) *
+            10000;
+        return ratioInBasisPoint;
+    }
+
     function _totalAmountUserMinted() internal view returns (uint256) {
         return getTotalSharesMinted() - s_ownerShares;
     }
@@ -209,5 +257,9 @@ contract FundVault is ERC4626Fees {
 
     function getAmountOwnerCanWithdraw() public view returns (uint256) {
         return _amountOwnerCanWithDraw();
+    }
+
+    function getAmountSharesToMint() public view returns (uint256) {
+        return _calculateSharesToMint(100e18);
     }
 }

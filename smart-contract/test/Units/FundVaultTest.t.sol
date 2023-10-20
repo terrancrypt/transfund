@@ -55,6 +55,19 @@ contract FundVaultTest is Test {
         _;
     }
 
+    modifier vaultDepositedAndInvested() {
+        vm.startPrank(fundManager);
+        usdc.mint(FUND_MANAGER_AMOUNT);
+        usdc.approve(address(fundVault), FUND_MANAGER_AMOUNT);
+        fundVault.deposit(FUND_MANAGER_AMOUNT, fundManager);
+        vm.stopPrank();
+
+        vm.startPrank(investor);
+        usdc.approve(address(fundVault), FAUCET_AMOUNT);
+        fundVault.deposit(FAUCET_AMOUNT, investor);
+        vm.stopPrank();
+    }
+
     function testFundManagerCanDepositToFundVault()
         public
         fundManagerDepositToVault
@@ -216,6 +229,11 @@ contract FundVaultTest is Test {
         assert(
             amountSharesOfOwnerAfterWithdraw == amountFundManagerMustCommited
         );
+    }
+
+    function testGetAmountSharesToMint() public fundManagerDepositToVault {
+        uint256 amountShares = fundVault.getAmountSharesToMint();
+        console.log("Amount shares to mint: ", amountShares);
     }
 
     function _feeOnTotal(uint256 amount) internal pure returns (uint256) {
