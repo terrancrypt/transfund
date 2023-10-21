@@ -3,8 +3,9 @@ pragma solidity 0.8.21;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
+import {ISwapRouter} from "./Interfaces/ISwapRouter.sol";
 import {FundVault} from "./Vault/FundVault.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract Engine is AccessControl {
     /*//////////////////////////////////////////////////////////////
@@ -13,10 +14,18 @@ contract Engine is AccessControl {
     error Engine__InvalidAddress();
     error Engine__AssetExisted(address);
     error Engine__AssetNotExist();
+    error Engine__OnlyFundManager();
+    error Engine__NotAllowed();
+
+    /*//////////////////////////////////////////////////////////////
+                            Types
+    //////////////////////////////////////////////////////////////*/
+    using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
                         State Variables
     //////////////////////////////////////////////////////////////*/
+    ISwapRouter private immutable i_swapRouter;
     mapping(uint24 assetId => IERC20 asset) private s_assets;
     uint24 private s_currentAssetId;
     mapping(IERC20 asset => bool) private s_assetExist;
@@ -26,8 +35,9 @@ contract Engine is AccessControl {
     /*//////////////////////////////////////////////////////////////
                             Constructor
     //////////////////////////////////////////////////////////////*/
-    constructor() {
+    constructor(ISwapRouter _swapRouter) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        i_swapRouter = _swapRouter;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -39,6 +49,12 @@ contract Engine is AccessControl {
     /*//////////////////////////////////////////////////////////////
                             Modifiers
     //////////////////////////////////////////////////////////////*/
+    modifier onlyFundManger(address fundManager) {
+        if (s_fundVaultOwnership[fundManager] != address(0)) {
+            revert Engine__OnlyFundManager();
+        }
+        _;
+    }
 
     /*//////////////////////////////////////////////////////////////
                         Owner Functions
@@ -57,16 +73,23 @@ contract Engine is AccessControl {
         emit AddAsset(address(asset));
     }
 
+    /*//////////////////////////////////////////////////////////////
+                        Fund Manger Functions
+    //////////////////////////////////////////////////////////////*/
     function createFundVault(
         IERC20 asset,
         uint256 basicPoints,
-        uint256 ownerSharesPercentage
+        uint256 ownerSharesPercentage,
+        uint256 divideProfits
     ) external returns (address) {
         _isAssetExisted(asset);
         FundVault fundVault = new FundVault(
+            address(this),
+            _msgSender(),
             asset,
             basicPoints,
-            ownerSharesPercentage
+            ownerSharesPercentage,
+            divideProfits
         );
 
         s_fundVaultOwnership[_msgSender()] = address(fundVault);

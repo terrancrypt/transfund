@@ -7,39 +7,58 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title Fund Vault Contract for TransFund Protocol
 /// @author terrancrypt
 /// @notice This contract helps the Fund Manager manage their fund, helping to calculate the number of vToken (or shares) deposite and withdraw from the fund.
 /// @dev Default token decimals = 18, currently there are no additional features for decimals of each type of ERC20 token.
-contract FundVault is ERC4626Fees {
+contract FundVault is ERC4626Fees, Ownable {
     error FundVault__MustBeOwner();
     error FundVault__VaultIsFull();
     error FundVault__OwnerCantWithdraw();
+    error FundVault__AddressInvalid();
+    error FundVault__TokenInvestNotFound();
 
+    using SafeERC20 for IERC20;
+
+    address public immutable i_engine;
     address payable public immutable i_vaultOwner;
+    uint256 public immutable i_ownerSharesPercentage;
+    uint256 public immutable i_divideProfits;
     uint256 public s_entryFeeBasicPoints;
     uint256 public s_ownerShares;
-    uint256 public immutable i_ownerSharesPercentage;
     uint256 public s_totalSharesCanMint;
 
     struct TokenInvest {
         address token;
-        uint256 amount;
         address priceFeed;
     }
     mapping(uint256 tokenInvestId => TokenInvest) private s_tokenInvested;
     uint256 private s_currentTokenInvestId;
 
     constructor(
+        address engine,
+        address initialOwner,
         IERC20 _asset,
         uint256 _feeBasicPoints,
-        uint256 _ownerSharesPercentage
-    ) ERC4626(_asset) ERC20("Vault Trans Fund Token", "vTFT") {
+        uint256 _ownerSharesPercentage,
+        uint256 _divideProfits
+    )
+        ERC4626(_asset)
+        ERC20("Vault Trans Fund Token", "vTFT")
+        Ownable(initialOwner)
+    {
+        i_engine = engine;
         i_vaultOwner = payable(msg.sender);
         s_entryFeeBasicPoints = _feeBasicPoints;
         i_ownerSharesPercentage = _ownerSharesPercentage;
+        i_divideProfits = _divideProfits;
     }
+
+    event AddTokenInvest(address token, address priceFeed);
+    event SwapAssetToTokenInvest(address indexed tokenInvest, uint256 amount);
 
     modifier isVaultFull(uint256 assetsOrShares) {
         if (_msgSender() != i_vaultOwner) {
@@ -60,6 +79,31 @@ contract FundVault is ERC4626Fees {
         }
         _;
     }
+
+    function addInvestToken(
+        address token,
+        address priceFeed
+    ) external onlyOwner {
+        if (token == address(0) && priceFeed == (address(0))) {
+            revert FundVault__AddressInvalid();
+        }
+
+        s_tokenInvested[s_currentTokenInvestId].token = token;
+        s_tokenInvested[s_currentTokenInvestId].priceFeed = priceFeed;
+        s_currentTokenInvestId++;
+
+        emit AddTokenInvest(token, priceFeed);
+    }
+
+    function approveAndTransferToEngine(
+        address token,
+        uint256 amount
+    ) external onlyOwner {
+        IERC20(token).safeIncreaseAllowance(i_engine, amount);
+        IERC20(token).safeTransferFrom(address(this), i_engine, amount);
+    }
+
+    /// @dev just for testing, this function will be remove in future
 
     function deposit(
         uint256 assets,
@@ -220,15 +264,16 @@ contract FundVault is ERC4626Fees {
     }
 
     function _calculateTotalCapitalInUSD() internal view returns (uint256) {
-        uint256 totalAmountInUSD;
+        uint256 totalAmountInUSD = totalAssets();
         for (uint256 i; i < s_currentTokenInvestId; i++) {
-            uint256 tokenAmount = s_tokenInvested[s_currentTokenInvestId]
-                .amount;
-            address priceFeed = s_tokenInvested[s_currentTokenInvestId]
-                .priceFeed;
+            uint256 tokenAmount = IERC20(s_tokenInvested[i].token).balanceOf(
+                address(this)
+            );
+            address priceFeed = s_tokenInvested[i].priceFeed;
             (, int256 answer, , , ) = AggregatorV3Interface(priceFeed)
                 .latestRoundData();
-            uint256 tokenAmountInUSD = tokenAmount * (uint256(answer) * 1e10);
+            uint256 tokenAmountInUSD = (tokenAmount *
+                (uint256(answer) * 1e10)) / 1e18;
             totalAmountInUSD += tokenAmountInUSD;
         }
         return totalAmountInUSD;
@@ -259,7 +304,31 @@ contract FundVault is ERC4626Fees {
         return _amountOwnerCanWithDraw();
     }
 
-    function getAmountSharesToMint() public view returns (uint256) {
-        return _calculateSharesToMint(100e18);
+    function getTotalCapitalInVault() public view returns (uint256) {
+        return _calculateTotalCapitalInUSD();
+    }
+
+    function getAmountInUsdOfToken(
+        address token,
+        address priceFeed
+    ) public view returns (uint256) {
+        uint256 tokenAmount = IERC20(token).balanceOf(address(this));
+        (, int256 answer, , , ) = AggregatorV3Interface(priceFeed)
+            .latestRoundData();
+        uint256 tokenAmountInUSD = (tokenAmount * (uint256(answer) * 1e10)) /
+            1e18;
+        return tokenAmountInUSD;
+    }
+
+    function getAmountSharesToMint(
+        uint256 amountToDeposit
+    ) public view returns (uint256) {
+        return _calculateSharesToMint(amountToDeposit);
+    }
+
+    function getAmountAssetToWithdraw(
+        uint256 amountSharesToBurn
+    ) public view returns (uint256) {
+        return _calculateAmountInUSDToWithdraw(amountSharesToBurn);
     }
 }
