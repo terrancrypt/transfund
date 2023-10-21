@@ -28,8 +28,6 @@ const App = ({ Component, pageProps }: AppProps) => (
       <Component {...pageProps} />
     </WagmiConfig>
   </ConfigProvider>
-
-
 );
 
 export default App;

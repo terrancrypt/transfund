@@ -4,7 +4,7 @@ import Logo from "public/logo-web.png";
 
 const Header = () => {
   return (
-    <header className="container">
+    <header className="container px-4 mb-8 shadow-sm">
       <div className="flex justify-between items-center">
         <div>
           <Link href="/">
@@ -22,7 +22,7 @@ const Header = () => {
               <Link href="/dashboard"> DASHBOARD</Link>
             </li>
             <li className="hover:underline cursor-pointer transition-all">
-              <Link href="/dashboard"> FAUCET</Link>
+              <Link href="/faucet"> FAUCET</Link>
             </li>
             <li className="hover:underline cursor-pointer transition-all">
               <a
