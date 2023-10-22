@@ -11,6 +11,10 @@ Leverage and connect with other DeFi protocols like DEX, Lending Market, Staking
 
 I did not create a project or protocol to compete with DEXs, AMMs, Lending Pools, etc. Because in fact, DeFi projects on the current market such as Uniswap or Aave have done so well. And to build a project to compete with it is very difficult. With this project, I want to take advantage of the benefits that DeFi protocols offer.
 
+## Teck Stack
+- Front-end: NextJS, Viem,...
+- Smart-contract: Foundry, Chainlink's Data Feeds, Openzeppelin's ERC4626.
+
 ## Benefit
 
 ### Who will benefit if this protocol is operational in the future?
