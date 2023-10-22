@@ -166,7 +166,7 @@ const SingleVaultPage = () => {
 
   useEffect(() => {
     fetchVaultData();
-  }, [address]);
+  }, []);
 
   return (
     <>
@@ -212,7 +212,9 @@ const SingleVaultPage = () => {
                 </a>
               </p>
               <p>Asset to deposit: {vaultData?.assetSymbol}</p>
-              <p>Owner's shares percentage: {vaultData?.ownerSharesPercent}%</p>
+              <p>
+                Owner&apos;s shares percentage: {vaultData?.ownerSharesPercent}%
+              </p>
               <p>Deposit fee: {Number(vaultData?.fee) / 100}%</p>
               <p>Divide profits: {vaultData?.divideProfits}%</p>
             </div>

@@ -20,7 +20,7 @@ const Vaults = () => {
           </div>
         ) : (
           <p className="text-center w-full">
-            "You need to connect your wallet to see this page!"
+            &quot;You need to connect your wallet to see this page!&quot;
           </p>
         )}
       </div>

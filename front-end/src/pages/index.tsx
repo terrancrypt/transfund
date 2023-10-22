@@ -22,7 +22,7 @@ export default function Home() {
             target="_blank"
             className="underline"
           >
-            ETHGlobal's ETHOnline 2023
+            ETHGlobal&apos;s ETHOnline 2023
           </a>
           .
         </p>
