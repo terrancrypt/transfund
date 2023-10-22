@@ -3,7 +3,9 @@ import EngineABI from "../abis/EngineAbi.json";
 import { engineContract } from "./contractList";
 
 // read
-async function getAllContractAddresses(chainId: number) {
+async function getAllContractAddresses(
+  chainId: number
+): Promise<string[] | null> {
   const address = engineContract[chainId].address;
   try {
     const result = await readContract({
@@ -12,8 +14,9 @@ async function getAllContractAddresses(chainId: number) {
       functionName: "getFundVaultAddresses",
       chainId,
     });
-    return result;
+    return result as any;
   } catch (error) {
+    console.log(error);
     return null;
   }
 }

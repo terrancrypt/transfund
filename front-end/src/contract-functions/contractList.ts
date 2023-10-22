@@ -7,11 +7,11 @@ interface Contract {
 const engineContract: Contract = {
   // ETH Sepolia
   11155111: {
-    address: "0x11946A8ab0FC26d3975519Fd031D1440E6088B58",
+    address: "0xc401Ee4eF9bDe268F711C0Dc6DD9B1fAE6Cc92ba",
   },
   // Polygon Mumbai
   80001: {
-    address: "0xc3cE97451Cce9deAD8e1bc4c538b5621639Ae458",
+    address: "0xB9019c710C8620cf23531c6C92676d0bcCDB2306",
   },
 };
 

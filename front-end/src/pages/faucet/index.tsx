@@ -21,7 +21,7 @@ const Faucet = () => {
             <FaucetTable chainId={chain ? chain.id : ""} />
           </>
         ) : (
-          <p className="text-white text-center w-full">
+          <p className="text-center w-full">
             "You need to connect your wallet to see this page!"
           </p>
         )}

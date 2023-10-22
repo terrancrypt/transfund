@@ -6,3 +6,7 @@
     margin-right: auto;
     margin-left: auto;
 }
+
+a {
+    color: black !important;
+}

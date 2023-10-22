@@ -1,12 +1,28 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import TableVault from "./components/TableVault";
+import { useNetwork } from "wagmi";
+
 const Vaults = () => {
+  const { chain } = useNetwork();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   return (
     <section className="container">
-      <div className="text-center text-2xl font-bold">FUND VAULTS</div>
+      <div className="text-center text-2xl font-bold pb-6">FUND VAULTS</div>
 
-      <div className="p-10">
-        <TableVault />
+      <div>
+        {isMounted && chain ? (
+          <div className="p-10">
+            <TableVault chainId={chain.id} />
+          </div>
+        ) : (
+          <p className="text-center w-full">
+            "You need to connect your wallet to see this page!"
+          </p>
+        )}
       </div>
     </section>
   );

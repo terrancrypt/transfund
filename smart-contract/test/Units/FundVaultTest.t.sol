@@ -40,7 +40,6 @@ contract FundVaultTest is Test {
         weth = new MockWETH(fundManager);
         wbtc = new MockWBTC(fundManager);
         fundVault = new FundVault(
-            address(0),
             fundManager,
             usdc,
             FEE_BASIS_POINT,

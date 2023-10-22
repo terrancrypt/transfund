@@ -14,16 +14,25 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 /// @author terrancrypt
 /// @notice This contract helps the Fund Manager manage their fund, helping to calculate the number of vToken (or shares) deposite and withdraw from the fund.
 /// @dev Default token decimals = 18, currently there are no additional features for decimals of each type of ERC20 token.
-contract FundVault is ERC4626Fees, Ownable {
+/// @dev To save time, I use the FundVault contract for direct interaction. This will be change in the future.
+contract FundVault is ERC4626Fees {
+    /*//////////////////////////////////////////////////////////////
+                            Errors
+    //////////////////////////////////////////////////////////////*/
     error FundVault__MustBeOwner();
     error FundVault__VaultIsFull();
     error FundVault__OwnerCantWithdraw();
     error FundVault__AddressInvalid();
     error FundVault__TokenInvestNotFound();
 
+    /*//////////////////////////////////////////////////////////////
+                            Types
+    //////////////////////////////////////////////////////////////*/
     using SafeERC20 for IERC20;
 
-    address public immutable i_engine;
+    /*//////////////////////////////////////////////////////////////
+                        State Variables
+    //////////////////////////////////////////////////////////////*/
     address payable public immutable i_vaultOwner;
     uint256 public immutable i_ownerSharesPercentage;
     uint256 public immutable i_divideProfits;
@@ -38,28 +47,31 @@ contract FundVault is ERC4626Fees, Ownable {
     mapping(uint256 tokenInvestId => TokenInvest) private s_tokenInvested;
     uint256 private s_currentTokenInvestId;
 
+    /*//////////////////////////////////////////////////////////////
+                            Constructor
+    //////////////////////////////////////////////////////////////*/
     constructor(
-        address engine,
-        address initialOwner,
+        address _owner,
         IERC20 _asset,
         uint256 _feeBasicPoints,
         uint256 _ownerSharesPercentage,
         uint256 _divideProfits
-    )
-        ERC4626(_asset)
-        ERC20("Vault Trans Fund Token", "vTFT")
-        Ownable(initialOwner)
-    {
-        i_engine = engine;
-        i_vaultOwner = payable(msg.sender);
+    ) ERC4626(_asset) ERC20("Vault Trans Fund Token", "vTFT") {
+        i_vaultOwner = payable(_owner);
         s_entryFeeBasicPoints = _feeBasicPoints;
         i_ownerSharesPercentage = _ownerSharesPercentage;
         i_divideProfits = _divideProfits;
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            Events
+    //////////////////////////////////////////////////////////////*/
     event AddTokenInvest(address token, address priceFeed);
     event SwapAssetToTokenInvest(address indexed tokenInvest, uint256 amount);
 
+    /*//////////////////////////////////////////////////////////////
+                            Modifiers
+    //////////////////////////////////////////////////////////////*/
     modifier isVaultFull(uint256 assetsOrShares) {
         if (_msgSender() != i_vaultOwner) {
             if (assetsOrShares > s_totalSharesCanMint) {
@@ -80,10 +92,12 @@ contract FundVault is ERC4626Fees, Ownable {
         _;
     }
 
-    function addInvestToken(
-        address token,
-        address priceFeed
-    ) external onlyOwner {
+    /*//////////////////////////////////////////////////////////////
+                        Owner Functions
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev priceFeed param will be removed in future, just for summit in ETHOnline
+    function addInvestToken(address token, address priceFeed) external {
         if (token == address(0) && priceFeed == (address(0))) {
             revert FundVault__AddressInvalid();
         }
@@ -95,16 +109,9 @@ contract FundVault is ERC4626Fees, Ownable {
         emit AddTokenInvest(token, priceFeed);
     }
 
-    function approveAndTransferToEngine(
-        address token,
-        uint256 amount
-    ) external onlyOwner {
-        IERC20(token).safeIncreaseAllowance(i_engine, amount);
-        IERC20(token).safeTransferFrom(address(this), i_engine, amount);
-    }
-
-    /// @dev just for testing, this function will be remove in future
-
+    /*//////////////////////////////////////////////////////////////
+                        ERC4626 Functions
+    //////////////////////////////////////////////////////////////*/
     function deposit(
         uint256 assets,
         address receiver
@@ -178,6 +185,9 @@ contract FundVault is ERC4626Fees, Ownable {
         return i_vaultOwner;
     }
 
+    /*//////////////////////////////////////////////////////////////
+                        Hook Functions
+    //////////////////////////////////////////////////////////////*/
     function _afterDeposit(uint256 shares) internal virtual {
         if (_msgSender() == i_vaultOwner && i_ownerSharesPercentage > 0) {
             s_ownerShares += shares;
@@ -192,8 +202,9 @@ contract FundVault is ERC4626Fees, Ownable {
         }
     }
 
+    /// @dev This function has not been implemented yet
     function _beforeWithdraw(uint256 assets) internal virtual {
-        // trước khi rút tiền, tính toán một phần tiền lãi cho owner của fund, chuyển phần tiền lãi đó dưới dạng vToken để gửi cho owner
+        // Before withdrawing money, calculate a portion of the interest for the fund's owner, transfer that portion of the interest in the form of vToken to send to the owner
     }
 
     function _afterWithdraw(uint256 shares) internal virtual {
@@ -209,6 +220,9 @@ contract FundVault is ERC4626Fees, Ownable {
         }
     }
 
+    /*//////////////////////////////////////////////////////////////
+                        Internal View Functions
+    //////////////////////////////////////////////////////////////*/
     function _amountOwnerCanWithDraw() internal view returns (uint256) {
         if (i_ownerSharesPercentage == 0) {
             return s_ownerShares;
@@ -291,6 +305,10 @@ contract FundVault is ERC4626Fees, Ownable {
     function _totalAmountUserMinted() internal view returns (uint256) {
         return getTotalSharesMinted() - s_ownerShares;
     }
+
+    /*//////////////////////////////////////////////////////////////
+                        Getter Functions
+    //////////////////////////////////////////////////////////////*/
 
     function getTotalSharesMinted() public view returns (uint256) {
         return IERC4626(address(this)).totalSupply();

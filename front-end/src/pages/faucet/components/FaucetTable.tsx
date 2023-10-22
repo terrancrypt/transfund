@@ -11,7 +11,7 @@ import {
 import {
   fetchTokenBalance,
   writeFaucet,
-} from "@/contract-functions/interacTokenContract";
+} from "@/contract-functions/interactTokenContract";
 
 interface FaucetTableProps {
   chainId: string | number;

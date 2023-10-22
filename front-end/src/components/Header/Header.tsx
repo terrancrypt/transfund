@@ -19,9 +19,6 @@ const Header = () => {
               <Link href="/vaults"> FUND VAULTS</Link>
             </li>
             <li className="hover:underline cursor-pointer transition-all">
-              <Link href="/dashboard"> DASHBOARD</Link>
-            </li>
-            <li className="hover:underline cursor-pointer transition-all">
               <Link href="/faucet"> FAUCET</Link>
             </li>
             <li className="hover:underline cursor-pointer transition-all">

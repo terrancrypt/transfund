@@ -1,7 +1,7 @@
 import { readContract } from "@wagmi/core";
 import MockTokenABI from "../abis/MockTokenABI.json";
 import { writeContract, fetchBalance } from "@wagmi/core";
-import { formatEther } from "viem";
+import { formatEther, parseEther } from "viem";
 
 // read
 async function getTokenSymbol(
@@ -59,26 +59,26 @@ async function writeFaucet(
   }
 }
 
-// async function approveEngineContract(
-//   chainId: number,
-//   address: string,
-//   userAccount: string,
-//   amount: number,
-//   spender: string
-// ) {
-//   try {
-//     const { hash } = await writeContract({
-//       address: address as any,
-//       abi: MockTokenABI,
-//       chainId,
-//       functionName: "approve",
-//       args: [spender, parseEther(String(amount))],
-//       account: userAccount as any,
-//     });
-//     return hash;
-//   } catch (error) {
-//     return null;
-//   }
-// }
+async function approveContract(
+  chainId: number,
+  address: string,
+  userAccount: string,
+  amount: number,
+  spender: string
+) {
+  try {
+    const { hash } = await writeContract({
+      address: address as any,
+      abi: MockTokenABI,
+      chainId,
+      functionName: "approve",
+      args: [spender, parseEther(String(amount))],
+      account: userAccount as any,
+    });
+    return hash;
+  } catch (error) {
+    return null;
+  }
+}
 
-export { getTokenSymbol, writeFaucet, fetchTokenBalance };
+export { getTokenSymbol, writeFaucet, fetchTokenBalance, approveContract };
