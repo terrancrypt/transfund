@@ -141,3 +141,6 @@ The integration of DAO is indeed an important feature in the protocol. DAO can m
 ### Back-end Server (Offchain)
 I plan to use a backend server to listen to events from the Vault, store vault information, and reduce unnecessary calls to smart contracts, thereby improving the performance of the dApp.
 
+### Mask Network
+I think it would be good if the protocol deployed together with Mask Network, where fund managers can share their personal information to increase credibility.
+
